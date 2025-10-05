@@ -47,7 +47,6 @@ stages:
       gnome-control-center gnome-common gnome-software-vso-plugin gnome-backgrounds gjs
       libgirepository-1.0-1 gir1.2-gnomebluetooth-3.0 gir1.2-glib-2.0 gir1.2-gtk-3.0 gir1.2-gmenu-3.0 || true
     - apt -y install lightdm cinnamon-desktop-environment
-    # Use tee directly, as the shell commands within a VIB module are executed with root privileges
     - echo "Package: snapd\nPin: release a=*\nPin-Priority: -10" | tee /etc/apt/preferences.d/nosnap.pref
     - apt update
     - apt -y install gnome-software
