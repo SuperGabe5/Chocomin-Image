@@ -1,135 +1,85 @@
-name: Chocomin
-id: chocomin
-vibversion: 1.0.0
-stages:
-- id: build
-  base: ghcr.io/vanilla-os/core:dev
-  addincludes: true
-  singlelayer: false
-  labels:
-    maintainer: Vanilla OS Contributors
-  args:
-    DEBIAN_FRONTEND: noninteractive
-  runs:
-    commands:
-      - echo 'APT::Install-Recommends "1";' > /etc/apt/apt.conf.d/01norecommends
+name: Vib Build (Podman)
 
-  modules:
-  - name: init-setup
-    type: shell
-    commands:
-    - echo 'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games"' > /etc/environment
-    - sed -i '4,10d' /etc/profile
-    - apt update
-    - apt clean
-    - apt-mark hold snapd gnome-software-plugin-snap
-    - apt -y install squashfs-tools minisign
+on:
+  push:
+    branches:
+      - 'dev'
+    tags:
+      - '*'
+  workflow_dispatch:
+  pull_request:
 
-  - name: vanilla-tools
-    type: shell
-    sources:
-      - type: tar
-        url: https://github.com/Vanilla-OS/vanilla-tools/releases/download/v1.0.0/vanilla-tools.tar.gz
-        checksum: 0e1d92d9c9154f9a115e97b40ff692afa52ddd0d9f770a8ec67440bf1a48aa72
-    commands:
-    - mkdir -p /usr/bin
-    - cp /sources/vanilla-tools/vanilla-tools/vanilla-tools/lpkg /usr/bin/lpkg
-    - cp /sources/vanilla-tools/vanilla-tools/vanilla-tools/cur-gpu /usr/bin/cur-gpu
-    - chmod +x /usr/bin/lpkg
-    - chmod +x /usr/bin/cur-gpu
+env:
+  BUILDX_NO_DEFAULT_ATTESTATIONS: 1
 
-  - name: install-cinnamon-and-remove-gnome
-    type: shell
-    commands:
-    - apt update
-    # Temporarily unhold gnome-software before installation
-    - apt-mark unhold gnome-software
-    - apt purge --autoremove -y gdm3 nautilus gnome-core gnome-essentials gnome-control-center gnome-common gnome-software-vso-plugin gnome-backgrounds || true
-    # Use --allow-change-held-packages to install cinnamon and then gnome-software
-    - apt -y --allow-change-held-packages install lightdm cinnamon-desktop-environment
-    - apt purge --autoremove -y gjs libgirepository-1.0-1 gir1.2-gnomebluetooth-3.0 gir1.2-glib-2.0 gir1.2-gtk-3.0 gir1.2-gmenu-3.0 || true
-    - apt -y --allow-change-held-packages install gnome-software
-    - xdg-mime default nemo.desktop inode/directory
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
 
-  - name: packages-modules
-    type: includes
-    includes:
-      - modules/00-vanilla-desktop-base.yml
-      - modules/00-vanilla-backgrounds.yml
-      - modules/00-vanilla-first-setup.yml
-      - modules/00-vanilla-system-operator.yml
-      - modules/00-vanilla-apx-gui.yml
-      - modules/00-vanilla-sideload.yml
-      - modules/00-vanilla-updates-utility.yml
-      - modules/00-vanilla-prime-utility.yml
-      - modules/02-waydroid-modules.yml
-      - modules/03-fswarn.yml
-      - modules/10-vanilla-abroot-rollback-notifier.yml
-      - modules/50-laptop-goodies.yml
-      - modules/60-media.yml
-      - modules/80-printers.yml
-      - modules/90-3d-utils.yml
-      - modules/100-accessibility.yml
-      - modules/110-fonts.yml
-      - modules/120-network.yml
-      - modules/121-disable-ssh-daemon.yml
-      - modules/130-plymouth.yml
-      - modules/131-plymouth-theme-vanilla.yml
-      - modules/140-password.yml
-      - modules/160-utilities.yml
-      - modules/210-libs-extra.yml
-      - modules/300-hide-image-magick.yml
-      - modules/997-ensure-exec-hooks.yml
-      - modules/998-vanilla-cleanup.yml
-      - modules/999-pkg-cleanup.yml
-      - modules/999-clear-first-setup-steps-unit.yml
+    steps:
+    - uses: actions/checkout@v4
 
-  - name: remove-blackbox-rescue-since-not-gnome
-    type: shell
-    commands:
-      - rm -f /usr/share/applications/com.raggesilver.BlackBox.desktop
+    - name: Set tag for release builds
+      if: ${{ github.ref_type == 'tag' }}
+      run: |
+        sed 's/ghcr.io\/vanilla-os\/core:dev/ghcr.io\/vanilla-os\/core:main/' -i recipe.yml
 
-  - name: fix-lightdm-permissions-service
-    type: shell
-    commands:
-    - mkdir -p /etc/systemd/system/multi-user.target.wants/
-    - ln -s /usr/lib/systemd/system/fix-gdm-permissions.service /etc/systemd/system/multi-user.target.wants/
-    - sed -i 's/gdm/lightdm/g' /usr/lib/systemd/system/fix-gdm-permissions.service
+    - name: Build with vib and Podman
+      uses: vanilla-os/vib-gh-action@main
+      with:
+        recipe: 'recipe.yml'
+        plugins: 'Vanilla-OS/vib-fsguard:v1.6.1'
 
-  - name: gnome-software-setup
-    type: shell
-    commands:
-    - rm /usr/lib/*/gnome-software/plugins-*/libgs_plugin_packagekit.so
+    - uses: actions/upload-artifact@v4
+      with:
+         name: Containerfile
+         path: Containerfile
 
-  - name: cleanup
-    type: shell
-    commands:
-    - apt autoremove -y
-    - apt clean
-    - lpkg --lock
+    - name: Generate image name
+      id: generate_image_name
+      run: |
+        REPO_OWNER_LOWERCASE=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')
+        echo "REPO_OWNER_LOWERCASE=$REPO_OWNER_LOWERCASE" >> "$GITHUB_ENV"
+        echo "IMAGE_URL=ghcr.io/$REPO_OWNER_LOWERCASE/desktop" >> "$GITHUB_ENV"
 
-  - name: sysconf-setup
-    type: shell
-    commands:
-      - rsync -a /etc/ /sysconf/
+    - name: Login to GitHub Package Registry with Podman
+      uses: redhat-actions/podman-login@v1
+      if: ${{ github.event_name != 'pull_request' }}
+      with:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        registry: ghcr.io
 
-  - name: fsguard
-    type: fsguard
-    CustomFsGuard: false
-    FsGuardLocation: "/usr/sbin/FsGuard"
-    GenerateKey: true
-    FilelistPaths: ["/usr/bin"]
-    modules:
-      - name: remove-prev-fsguard
-        type: shell
-        commands:
-          - rm -rf /FsGuard
-          - rm -f ./minisign.pub ./minisign.key
-          - chmod +x /usr/share/init.d/010-fsguard.sh
+    - name: Build and Push the Podman image
+      id: push
+      run: |
+        TAGS=""
+        if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          TAGS+="--tag ${{ env.IMAGE_URL }}:$(echo ${{ github.ref_name }} | sed 's/v//') "
+          TAGS+="--tag ${{ env.IMAGE_URL }}:$(echo ${{ github.ref_name }} | sed -E 's/v?([0-9]+\.[0-9]+)\.[0-9]+/\1/') "
+        else
+          BRANCH_NAME=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///g')
+          TAGS+="--tag ${{ env.IMAGE_URL }}:$BRANCH_NAME "
+        fi
+        
+        podman build --file Containerfile ${TAGS} --platform linux/amd64 .
 
-  - name: cleanup2
-    type: shell
-    commands:
-      - rm -rf /tmp/*
-      - rm -rf /var/tmp/*
-      - rm -rf /sources
+        if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          podman push ${TAGS} --all
+          DIGEST=$(podman images --digests --format "{{.Digest}}" | head -n 1)
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Attest pushed image
+      uses: actions/attest-build-provenance@v2
+      id: attest
+      if: ${{ github.event_name != 'pull_request' }}
+      with:
+        subject-name: ${{ env.IMAGE_URL }}
+        subject-digest: ${{ steps.push.outputs.digest }}
+        push-to-registry: false
