@@ -50,12 +50,24 @@ jobs:
           curl \
           podman
 
-    - name: Manual VIB setup
+        - name: Manual VIB setup (robust)
       run: |
+        VIB_VERSION="v1.0.2"
+        TEMP_DIR=$(mktemp -d)
+        
         echo "Installing Vib version ${{ env.VIB_VERSION }}"
         
+        # Install necessary dependencies
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          jq \
+          curl \
+          podman \
+          libglib2.0-dev \
+          build-essential
+        
         # Get the asset URLs from the GitHub API
-        VIB_RELEASE_URL="https://api.github.com/repos/Vanilla-OS/Vib/releases/tags/${{ env.VIB_VERSION }}"
+        VIB_RELEASE_URL="https://api.github.com/repos/Vanilla-OS/Vib/releases/tags/${VIB_VERSION}"
         ASSETS=$(curl -sL $VIB_RELEASE_URL | jq -r '.assets[] | {name, url} | select(.name | contains("amd64"))')
 
         VIB_BINARY_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("^vib-amd64$")) | .url')
@@ -65,29 +77,26 @@ jobs:
         sudo mkdir -p /usr/share/vib/plugins
         
         # Download and install the vib binary
-        curl -sL -H "Accept: application/octet-stream" "$VIB_BINARY_URL" | sudo tee /usr/local/bin/vib > /dev/null
+        curl -fsL -H "Accept: application/octet-stream" "$VIB_BINARY_URL" > "${TEMP_DIR}/vib-amd64"
+        sudo mv "${TEMP_DIR}/vib-amd64" /usr/local/bin/vib
         sudo chmod +x /usr/local/bin/vib
         
         # Download and extract the core plugins
-        curl -sL -H "Accept: application/octet-stream" "$PLUGINS_ARCHIVE_URL" | sudo tar -xz -C /usr/share/vib/plugins/
+        curl -fsL -H "Accept: application/octet-stream" "$PLUGINS_ARCHIVE_URL" | sudo tar -xzf - -C /usr/share/vib/plugins/
         
         # Download and install the custom plugin (vib-fsguard)
-        curl -sL "https://github.com/Vanilla-OS/vib-fsguard/releases/download/${{ env.FSGUARD_VERSION }}/fsguard.so" | sudo tee /usr/share/vib/plugins/fsguard.so > /dev/null
+        curl -fsL "https://github.com/Vanilla-OS/vib-fsguard/releases/download/v1.6.1/fsguard.so" | sudo tee /usr/share/vib/plugins/fsguard.so > /dev/null
         
-        # Verify the plugins are present
+        # Check plugin presence and vib dependencies
         echo "Listing contents of /usr/share/vib/plugins/"
         ls -l /usr/share/vib/plugins/
+        echo "Checking vib dependencies..."
+        ldd /usr/local/bin/vib
         
         # Verify vib version
         vib --version
         
-    - name: Build recipe
-      run: vib build recipe.yml
-
-    - uses: actions/upload-artifact@v4
-      with:
-         name: Containerfile
-         path: Containerfile
+        rm -rf "$TEMP_DIR"
 
     - name: Generate image name
       run: |
