@@ -1,5 +1,5 @@
-name: Chocomin-Cinnamon
-id: chocomin-cinnamon
+name: Chocomin
+id: chocomin
 vibversion: 1.0.0
 stages:
 - id: build
