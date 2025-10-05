@@ -3,7 +3,8 @@ id: chocomin
 vibversion: 1.0.0
 stages:
 - id: build
-  base: ghcr.io/vanilla-os/core:dev
+  # Use the official desktop image as the base
+  base: ghcr.io/vanilla-os/desktop:dev
   addincludes: true
   singlelayer: false
   labels:
@@ -15,46 +16,25 @@ stages:
       - echo 'APT::Install-Recommends "1";' > /etc/apt/apt.conf.d/01norecommends
 
   modules:
-  - name: init-setup
+  - name: remove-gnome-install-cinnamon
     type: shell
     commands:
-    - echo 'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games"' > /etc/environment
-    - sed -i '4,10d' /etc/profile
-    - apt update
-    - apt clean
-    - apt-mark hold snapd gnome-software-plugin-snap
-    - apt -y install squashfs-tools minisign
-
-  - name: vanilla-tools
-    type: shell
-    sources:
-      - type: tar
-        url: https://github.com/Vanilla-OS/vanilla-tools/releases/download/v1.0.0/vanilla-tools.tar.gz
-        checksum: 0e1d92d9c9154f9a115e97b40ff692afa52ddd0d9f770a8ec67440bf1a48aa72
-    commands:
-    - mkdir -p /usr/bin
-    - cp /sources/vanilla-tools/vanilla-tools/vanilla-tools/lpkg /usr/bin/lpkg
-    - cp /sources/vanilla-tools/vanilla-tools/vanilla-tools/cur-gpu /usr/bin/cur-gpu
-    - chmod +x /usr/bin/lpkg
-    - chmod +x /usr/bin/cur-gpu
-
-  - name: install-cinnamon-and-remove-gnome
-    type: shell
-    commands:
-    - apt update
+    # Remove gnome-desktop and its packages
     - >-
-      apt purge --autoremove -y snapd gnome-software-plugin-snap gdm3 nautilus gnome-core gnome-essentials
+      apt purge --autoremove -y gdm3 nautilus gnome-core gnome-essentials
       gnome-control-center gnome-common gnome-software-vso-plugin gnome-backgrounds gjs
       libgirepository-1.0-1 gir1.2-gnomebluetooth-3.0 gir1.2-glib-2.0 gir1.2-gtk-3.0 gir1.2-gmenu-3.0 || true
+    # Install the Cinnamon desktop environment and lightdm
     - apt -y install lightdm cinnamon-desktop-environment
-    - echo "Package: snapd\nPin: release a=*\nPin-Priority: -10" | tee /etc/apt/preferences.d/nosnap.pref
-    - apt update
-    - apt -y install gnome-software
+    # Configure nemo as the default file manager
     - xdg-mime default nemo.desktop inode/directory
+    # Ensure gnome-software is still installed
+    - apt -y install gnome-software
 
   - name: packages-modules
     type: includes
     includes:
+      # Use the includes that are compatible with the base desktop image
       - modules/00-vanilla-desktop-base.yml
       - modules/00-vanilla-backgrounds.yml
       - modules/00-vanilla-first-setup.yml
@@ -84,23 +64,20 @@ stages:
       - modules/998-vanilla-cleanup.yml
       - modules/999-pkg-cleanup.yml
       - modules/999-clear-first-setup-steps-unit.yml
+      # Make sure to remove any modules that install conflicting GNOME components
+      # You may need to review the contents of each module
 
-  - name: remove-blackbox-rescue-since-not-gnome
+  - name: configure-desktop
     type: shell
     commands:
-      - rm -f /usr/share/applications/com.raggesilver.BlackBox.desktop
-
-  - name: fix-lightdm-permissions-service
-    type: shell
-    commands:
-    - mkdir -p /etc/systemd/system/multi-user.target.wants/
-    - ln -s /usr/lib/systemd/system/fix-gdm-permissions.service /etc/systemd/system/multi-user.target.wants/
-    - sed -i 's/gdm/lightdm/g' /usr/lib/systemd/system/fix-gdm-permissions.service
-
-  - name: gnome-software-setup
-    type: shell
-    commands:
+    # Fix the display manager permissions
+    - |
+      mkdir -p /etc/systemd/system/multi-user.target.wants/
+      ln -s /usr/lib/systemd/system/fix-gdm-permissions.service /etc/systemd/system/multi-user.target.wants/
+      sed -i 's/gdm/lightdm/g' /usr/lib/systemd/system/fix-gdm-permissions.service
+    # Remove gnome-software plugin for snap
     - rm /usr/lib/*/gnome-software/plugins-*/libgs_plugin_packagekit.so
+    - rm -f /usr/share/applications/com.raggesilver.BlackBox.desktop
 
   - name: cleanup
     type: shell
