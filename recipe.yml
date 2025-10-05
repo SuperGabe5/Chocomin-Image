@@ -1,5 +1,5 @@
-name: Chocomin
-id: chocomin
+name: Chocomin-Cinnamon
+id: chocomin-cinnamon
 vibversion: 1.0.0
 
 stages:
@@ -39,19 +39,32 @@ stages:
     - chmod +x /usr/bin/lpkg
     - chmod +x /usr/bin/cur-gpu
 
-  - name: remove-gnome-and-install-cinnamon
+  # Use the `packages` type to install Cinnamon and related packages
+  - name: cinnamon-desktop
+    type: packages
+    packages:
+      install:
+        - lightdm
+        - cinnamon-desktop-environment
+        - nemo-desktop
+        - gnome-software
+
+  # Use `shell` and `abroot` to disable the old display manager and set the new one
+  - name: configure-display-manager
     type: shell
     commands:
-    - apt update
-    - apt-mark hold gnome-software
-    # Add nautilus to the purge command
-    - apt purge --autoremove -y gdm3 nautilus vanilla-gnome-default-settings vanilla-tour gnome-core gnome-essentials gnome-control-center gnome-common gnome-software-vso-plugin gnome-backgrounds
-    - apt -y install lightdm cinnamon-desktop-environment
-    - apt purge --autoremove -y gjs libgirepository-1.0-1 gir1.2-gnomebluetooth-3.0 gir1.2-glib-2.0 gir1.2-gtk-3.0 gir1.2-gmenu-3.0
-    - apt -y install gnome-software
-    # Configure Nemo as the default file manager via xdg-mime
-    - xdg-mime default nemo.desktop inode/directory
+      - >-
+        abroot shell -C "
+        # Disable the default GNOME display manager
+        systemctl disable gdm3;
+        # Enable LightDM
+        systemctl enable lightdm;
+        # Set Nemo as the default file manager via xdg-mime
+        xdg-mime default nemo.desktop inode/directory
+        "
 
+  # Include only the modules you want, removing the conflicting GNOME ones.
+  # Do not include modules that install GNOME components like vanilla-tour.
   - name: packages-modules
     type: includes
     includes:
@@ -60,14 +73,12 @@ stages:
       - modules/00-vanilla-first-setup.yml
       - modules/00-vanilla-system-operator.yml
       - modules/00-vanilla-apx-gui.yml
-      - modules/00-vanilla-tour.yml
       - modules/00-vanilla-sideload.yml
       - modules/00-vanilla-updates-utility.yml
       - modules/00-vanilla-prime-utility.yml
       - modules/02-waydroid-modules.yml
       - modules/03-fswarn.yml
       - modules/10-vanilla-abroot-rollback-notifier.yml
-      # The nautilus-terminal-rightclick module is now irrelevant and should be removed
       - modules/50-laptop-goodies.yml
       - modules/60-media.yml
       - modules/80-printers.yml
@@ -87,12 +98,13 @@ stages:
       - modules/998-vanilla-cleanup.yml
       - modules/999-pkg-cleanup.yml
       - modules/999-clear-first-setup-steps-unit.yml
-  
+
+  # Other modules are fine, but ensure they don't depend on GNOME specifics.
   - name: remove-blackbox-rescue-since-not-gnome
     type: shell
     commands:
       - rm -f /usr/share/applications/com.raggesilver.BlackBox.desktop
-  
+
   - name: fix-lightdm-permissions-service
     type: shell
     commands:
@@ -137,4 +149,3 @@ stages:
       - rm -rf /tmp/*
       - rm -rf /var/tmp/*
       - rm -rf /sources
-
