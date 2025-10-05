@@ -1,0 +1,86 @@
+name: vso
+type: shell
+sources:
+  - type: tar
+    url: https://github.com/Vanilla-OS/vanilla-system-operator/releases/download/v2.0.6/vso.tar.gz
+    checksum: 8565829753ffb701081bf5df1043513b40d948eb0020736cb1dddccf5acbeed0
+commands:
+- mkdir -p /usr/bin
+- cp /sources/vso/vso/vso /usr/bin/vso
+- chmod +x /usr/bin/vso
+modules:
+- name: vso-manpage
+  type: shell
+  sources:
+    - type: tar
+      url: https://github.com/Vanilla-OS/vanilla-system-operator/releases/download/v2.0.6/vso-man.tar.gz
+      checksum: 26010d70eb60819ca540d75da7a500038cde3e8d0ac2873d82a74717ff51928d
+  commands:
+  - mv /sources/vso-manpage/vso-man/man/vso.1 /usr/share/man/man1/
+
+- name: vso-os-shell
+  type: shell
+  commands:
+  - chmod +x /usr/bin/vso-os-shell
+  - echo "/usr/bin/vso-os-shell" >> /etc/shells
+  - sed -i 's/^\(SHELL=\).*/\1\/usr\/bin\/vso-os-shell/' /etc/default/useradd
+
+- name: reset-vso
+  type: shell
+  commands:
+  - chmod +x /usr/bin/reset-vso
+
+- name: wait-for-connection
+  type: shell
+  commands:
+  - chmod +x /usr/bin/wait-for-connection
+
+- name: vso-gnome-ext
+  type: shell
+  sources:
+    - type: tar
+      url: https://github.com/Vanilla-OS/vso-gnome-ext/archive/refs/tags/1.4.tar.gz
+  commands:
+  - mkdir -p /usr/share/gnome-shell/extensions/
+  - mv /sources/vso-gnome-ext/1.4/vso-gnome-ext-1.4/vso\@vanillaos.org /usr/share/gnome-shell/extensions/vso\@vanillaos.org
+
+- name: vso-deps-install
+  type: apt
+  sources:
+    - packages:
+      - dpkg-dev
+      - ifstat
+
+- name: adwdialog
+  type: dpkg-buildpackage
+  source:
+    type: git
+    url: https://github.com/Vanilla-OS/AdwDialog.git
+    tag: v0.2.0
+    paths:
+      - adwdialog
+  modules:
+  - name: adwdialog-deps-install
+    type: apt
+    sources:
+      - packages:
+        - build-essential
+        - debhelper
+        - desktop-file-utils
+        - dpkg-dev
+        - gettext
+        - libadwaita-1-dev
+        - libjpeg-dev
+        - make
+        - meson
+        - python3
+
+- name: enable-systemd-unit
+  type: shell
+  commands:
+  - ln -s /usr/lib/systemd/system/vanilla-updates.service /etc/systemd/system/multi-user.target.wants/vanilla-updates.service
+  - ln -s /usr/lib/systemd/system/vanilla-updates.timer /etc/systemd/system/timers.target.wants/vanilla-updates.timer
+  - mkdir -p /usr/lib/systemd/user/default.target.wants
+  - ln -s /usr/lib/systemd/user/vso-pre-run.service /usr/lib/systemd/user/default.target.wants/vso-pre-run.service
+  - ln -s /usr/lib/systemd/user/vso-migrate-repo.service /usr/lib/systemd/user/default.target.wants/vso-migrate-repo.service
+  - ln -s /usr/lib/systemd/user/vso-tasks-rotation.service /usr/lib/systemd/user/default.target.wants/vso-tasks-rotation.service

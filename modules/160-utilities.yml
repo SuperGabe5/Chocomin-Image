@@ -1,0 +1,13 @@
+name: utilities
+type: apt
+sources:
+  - packages:
+    - gnome-disk-utility
+    - gnome-system-monitor
+    - gnome-sushi
+    - gnome-software
+    - ghostscript
+    - zenity
+    - flatpak
+    - gnome-software-plugin-flatpak
+    - locales-all
