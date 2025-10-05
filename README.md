@@ -1,1 +1,1 @@
-Chocomin is a Vanilla OS based system that uses the Cinnamon desktop environment instead of gnome and the yaru theme
+Chocomin is a Vanilla OS based system that uses the Cinnamon desktop environment with the yaru theme  and breeze cursors instead gnome
