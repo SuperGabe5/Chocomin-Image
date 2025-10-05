@@ -43,30 +43,46 @@ jobs:
       run: |
         sed 's/ghcr.io\/vanilla-os\/core:dev/ghcr.io\/vanilla-os\/core:main/' -i recipe.yml
 
-    - name: Manual VIB setup
-      run: |
-        echo "Installing Vib version ${{ env.VIB_VERSION }}"
-        # Create the necessary directories
-        sudo mkdir -p /usr/share/vib/plugins
-        
-        # Download and extract the vib binary
-        curl -sL "https://github.com/Vanilla-OS/Vib/releases/download/${{ env.VIB_VERSION }}/vib-amd64" | sudo tee /usr/local/bin/vib > /dev/null
-        sudo chmod +x /usr/local/bin/vib
-        
-        # Download and extract the core plugins
-        # Note: The core plugins archive was renamed in later versions.
-        # This assumes the format used in v1.0.2.
-        curl -sL "https://github.com/Vanilla-OS/Vib/releases/download/${{ env.VIB_VERSION }}/plugins-amd64.tar.gz" | sudo tar -xz -C /usr/share/vib/plugins/
-        
-        # Download and install the custom plugin (vib-fsguard)
-        curl -sL "https://github.com/Vanilla-OS/vib-fsguard/releases/download/v1.6.1/fsguard.so" | sudo tee /usr/share/vib/plugins/fsguard.so > /dev/null
-        
-        # Check that the plugins are present
-        echo "Listing contents of /usr/share/vib/plugins/"
-        ls -l /usr/share/vib/plugins/
-        
-        # Check vib version
-        vib --version
+    - name: Manual VIB setup (robust)
+  id: vib_setup
+  run: |
+    VIB_VERSION="${{ env.VIB_VERSION }}"
+    VIB_RELEASE_URL="https://api.github.com/repos/Vanilla-OS/Vib/releases/tags/${VIB_VERSION}"
+
+    # Get the asset URLs from the GitHub API
+    ASSETS=$(curl -s $VIB_RELEASE_URL | jq -r '.assets[] | {name, url} | select(.name | contains("amd64"))')
+
+    VIB_BINARY_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("vib-amd64$")) | .url')
+    PLUGINS_ARCHIVE_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("plugins.*tar.*")) | .url')
+
+    # Install dependencies needed to run Vib
+    sudo apt-get update
+    sudo apt-get install -y --no-install-recommends \
+      libglib2.0-dev \
+      build-essential \
+      jq
+
+    # Create the necessary directories
+    sudo mkdir -p /usr/share/vib/plugins
+    
+    # Download and extract the vib binary
+    curl -sL -H "Accept: application/octet-stream" "$VIB_BINARY_URL" | sudo tee /usr/local/bin/vib > /dev/null
+    sudo chmod +x /usr/local/bin/vib
+    
+    # Download and extract the core plugins
+    curl -sL -H "Accept: application/octet-stream" "$PLUGINS_ARCHIVE_URL" | sudo tar -xz -C /usr/share/vib/plugins/
+    
+    # Download and install the custom plugin (vib-fsguard)
+    # The fsguard.so file is not in a tarball, it's a direct download
+    curl -sL "https://github.com/Vanilla-OS/vib-fsguard/releases/download/v1.6.1/fsguard.so" | sudo tee /usr/share/vib/plugins/fsguard.so > /dev/null
+    
+    # Check that the core plugin is now present
+    echo "Listing contents of /usr/share/vib/plugins/"
+    ls -l /usr/share/vib/plugins/
+
+    # Verify vib version
+    vib --version
+
         
     - name: Build recipe
       run: vib build recipe.yml
