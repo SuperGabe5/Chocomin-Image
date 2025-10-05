@@ -1,5 +1,5 @@
-name: Chocomin-Cinnamon
-id: chocomin-cinnamon
+name: Chocomin
+id: chocomin
 vibversion: 1.0.0
 stages:
 - id: build
@@ -42,19 +42,20 @@ stages:
     type: shell
     commands:
     - apt update
-    - apt-mark hold gnome-software
-    # The packages below are likely already removed in the core image, but we
-    # include the purge command here for idempotence.
-    - apt purge --autoremove -y gdm3 nautilus gnome-core gnome-essentials gnome-control-center gnome-common gnome-software-vso-plugin gnome-backgrounds || true
+    - >-
+      apt purge --autoremove -y snapd gnome-software-plugin-snap gdm3 nautilus gnome-core gnome-essentials
+      gnome-control-center gnome-common gnome-software-vso-plugin gnome-backgrounds gjs
+      libgirepository-1.0-1 gir1.2-gnomebluetooth-3.0 gir1.2-glib-2.0 gir1.2-gtk-3.0 gir1.2-gmenu-3.0 || true
     - apt -y install lightdm cinnamon-desktop-environment
-    - apt purge --autoremove -y gjs libgirepository-1.0-1 gir1.2-gnomebluetooth-3.0 gir1.2-glib-2.0 gir1.2-gtk-3.0 gir1.2-gmenu-3.0 || true
+    - >-
+      echo -e "Package: snapd\nPin: release a=*\nPin-Priority: -10" | sudo tee /etc/apt/preferences.d/nosnap.pref
+    - apt update
     - apt -y install gnome-software
     - xdg-mime default nemo.desktop inode/directory
 
   - name: packages-modules
     type: includes
     includes:
-      # Use the included vanilla desktop base, but omit conflicting GNOME modules
       - modules/00-vanilla-desktop-base.yml
       - modules/00-vanilla-backgrounds.yml
       - modules/00-vanilla-first-setup.yml
