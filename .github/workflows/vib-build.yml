@@ -32,7 +32,7 @@ jobs:
       id-token: write
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v4
 
     - name: Change tag in recipe
       if: ${{ github.ref_type == 'tag' }}
@@ -40,7 +40,7 @@ jobs:
         sed 's/ghcr.io\/vanilla-os\/core:dev/ghcr.io\/vanilla-os\/core:main/' -i recipe.yml
 
     - name: Build with vib and Podman
-      uses: vanilla-os/vib-gh-action@main # <--- Use the main branch for the latest fixes
+      uses: vanilla-os/vib-gh-action@main # Use the main branch for the latest fixes
       with:
         recipe: 'recipe.yml'
         plugins: 'Vanilla-OS/vib-fsguard:v1.6.1'
@@ -96,7 +96,7 @@ jobs:
         fi
     
     - name: Attest pushed image
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@v2
       id: attest
       if: ${{ github.event_name != 'pull_request' }}
       with:
@@ -112,7 +112,7 @@ jobs:
     needs: build
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Generate package diff
         run: |
