@@ -1,5 +1,5 @@
-name: Chocomin
-id: chocomin
+name: Chocomin-Cinnamon
+id: chocomin-cinnamon
 vibversion: 1.0.0
 stages:
 - id: build
@@ -48,11 +48,7 @@ stages:
       libgirepository-1.0-1 gir1.2-gnomebluetooth-3.0 gir1.2-glib-2.0 gir1.2-gtk-3.0 gir1.2-gmenu-3.0 || true
     - apt -y install lightdm cinnamon-desktop-environment
     - |
-      abroot shell -C "tee /etc/apt/preferences.d/nosnap.pref <<EOF
-      Package: snapd
-      Pin: release a=*
-      Pin-Priority: -10
-      EOF"
+      abroot shell -C 'echo "Package: snapd\nPin: release a=*\nPin-Priority: -10" | sudo tee /etc/apt/preferences.d/nosnap.pref'
     - apt update
     - apt -y install gnome-software
     - xdg-mime default nemo.desktop inode/directory
