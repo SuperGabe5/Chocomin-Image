@@ -13,16 +13,15 @@ env:
   BUILDX_NO_DEFAULT_ATTESTATIONS: 1
   # Pin the version to the one you're using
   VIB_VERSION: v1.0.2
+  FSGUARD_VERSION: v1.6.1
 
 jobs:
   verify-image:
     runs-on: ubuntu-latest
-
     steps:
     - name: Verify Base Image Integrity
       if: ${{ github.ref_type == 'tag' }}
-      run:
-        gh attestation verify oci://ghcr.io/vanilla-os/core:main --owner Vanilla-OS
+      run: gh attestation verify oci://ghcr.io/vanilla-os/core:main --owner Vanilla-OS
       env:
         GH_TOKEN: ${{ github.token }}
 
@@ -43,46 +42,44 @@ jobs:
       run: |
         sed 's/ghcr.io\/vanilla-os\/core:dev/ghcr.io\/vanilla-os\/core:main/' -i recipe.yml
 
-    - name: Manual VIB setup (robust)
-  id: vib_setup
-  run: |
-    VIB_VERSION="${{ env.VIB_VERSION }}"
-    VIB_RELEASE_URL="https://api.github.com/repos/Vanilla-OS/Vib/releases/tags/${VIB_VERSION}"
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          jq \
+          curl \
+          podman
 
-    # Get the asset URLs from the GitHub API
-    ASSETS=$(curl -s $VIB_RELEASE_URL | jq -r '.assets[] | {name, url} | select(.name | contains("amd64"))')
+    - name: Manual VIB setup
+      run: |
+        echo "Installing Vib version ${{ env.VIB_VERSION }}"
+        
+        # Get the asset URLs from the GitHub API
+        VIB_RELEASE_URL="https://api.github.com/repos/Vanilla-OS/Vib/releases/tags/${{ env.VIB_VERSION }}"
+        ASSETS=$(curl -sL $VIB_RELEASE_URL | jq -r '.assets[] | {name, url} | select(.name | contains("amd64"))')
 
-    VIB_BINARY_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("vib-amd64$")) | .url')
-    PLUGINS_ARCHIVE_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("plugins.*tar.*")) | .url')
+        VIB_BINARY_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("^vib-amd64$")) | .url')
+        PLUGINS_ARCHIVE_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("plugins-amd64.tar.gz$")) | .url')
 
-    # Install dependencies needed to run Vib
-    sudo apt-get update
-    sudo apt-get install -y --no-install-recommends \
-      libglib2.0-dev \
-      build-essential \
-      jq
-
-    # Create the necessary directories
-    sudo mkdir -p /usr/share/vib/plugins
-    
-    # Download and extract the vib binary
-    curl -sL -H "Accept: application/octet-stream" "$VIB_BINARY_URL" | sudo tee /usr/local/bin/vib > /dev/null
-    sudo chmod +x /usr/local/bin/vib
-    
-    # Download and extract the core plugins
-    curl -sL -H "Accept: application/octet-stream" "$PLUGINS_ARCHIVE_URL" | sudo tar -xz -C /usr/share/vib/plugins/
-    
-    # Download and install the custom plugin (vib-fsguard)
-    # The fsguard.so file is not in a tarball, it's a direct download
-    curl -sL "https://github.com/Vanilla-OS/vib-fsguard/releases/download/v1.6.1/fsguard.so" | sudo tee /usr/share/vib/plugins/fsguard.so > /dev/null
-    
-    # Check that the core plugin is now present
-    echo "Listing contents of /usr/share/vib/plugins/"
-    ls -l /usr/share/vib/plugins/
-
-    # Verify vib version
-    vib --version
-
+        # Create the necessary directories
+        sudo mkdir -p /usr/share/vib/plugins
+        
+        # Download and install the vib binary
+        curl -sL -H "Accept: application/octet-stream" "$VIB_BINARY_URL" | sudo tee /usr/local/bin/vib > /dev/null
+        sudo chmod +x /usr/local/bin/vib
+        
+        # Download and extract the core plugins
+        curl -sL -H "Accept: application/octet-stream" "$PLUGINS_ARCHIVE_URL" | sudo tar -xz -C /usr/share/vib/plugins/
+        
+        # Download and install the custom plugin (vib-fsguard)
+        curl -sL "https://github.com/Vanilla-OS/vib-fsguard/releases/download/${{ env.FSGUARD_VERSION }}/fsguard.so" | sudo tee /usr/share/vib/plugins/fsguard.so > /dev/null
+        
+        # Verify the plugins are present
+        echo "Listing contents of /usr/share/vib/plugins/"
+        ls -l /usr/share/vib/plugins/
+        
+        # Verify vib version
+        vib --version
         
     - name: Build recipe
       run: vib build recipe.yml
@@ -120,12 +117,10 @@ jobs:
       id: push
       run: |
         TAGS=""
-        # Generate semantic versioning tags
         if [[ "${{ github.ref_type }}" == "tag" ]]; then
           TAGS+="--tag ${{ env.IMAGE_URL }}:$(echo ${{ github.ref_name }} | sed 's/v//') "
           TAGS+="--tag ${{ env.IMAGE_URL }}:$(echo ${{ github.ref_name }} | sed -E 's/v?([0-9]+\.[0-9]+)\.[0-9]+/\1/') "
         fi
-        # Add branch-based tag for non-tag pushes
         if [[ "${{ github.ref_type }}" != "tag" ]]; then
           BRANCH_NAME=$(echo ${{ github.ref_name }} | sed 's/refs\/heads\///g')
           TAGS+="--tag ${{ env.IMAGE_URL }}:$BRANCH_NAME "
