@@ -3,7 +3,6 @@ id: chocomin
 vibversion: 1.0.0
 stages:
 - id: build
-  # Use the official desktop image as the base
   base: ghcr.io/vanilla-os/desktop:dev
   addincludes: true
   singlelayer: false
@@ -19,71 +18,29 @@ stages:
   - name: remove-gnome-install-cinnamon
     type: shell
     commands:
-    # Remove gnome-desktop and its packages
+    - /usr/bin/apt update
     - >-
-      apt purge --autoremove -y gdm3 nautilus gnome-core gnome-essentials
+      /usr/bin/apt purge --autoremove -y gdm3 nautilus gnome-core gnome-essentials
       gnome-control-center gnome-common gnome-software-vso-plugin gnome-backgrounds gjs
       libgirepository-1.0-1 gir1.2-gnomebluetooth-3.0 gir1.2-glib-2.0 gir1.2-gtk-3.0 gir1.2-gmenu-3.0 || true
-    # Install the Cinnamon desktop environment and lightdm
-    - apt -y install lightdm cinnamon-desktop-environment
-    # Configure nemo as the default file manager
+    - /usr/bin/apt -y install lightdm cinnamon-desktop-environment
     - xdg-mime default nemo.desktop inode/directory
-    # Ensure gnome-software is still installed
-    - apt -y install gnome-software
-
-  - name: packages-modules
-    type: includes
-    includes:
-      # Use the includes that are compatible with the base desktop image
-      - modules/00-vanilla-desktop-base.yml
-      - modules/00-vanilla-backgrounds.yml
-      - modules/00-vanilla-first-setup.yml
-      - modules/00-vanilla-system-operator.yml
-      - modules/00-vanilla-apx-gui.yml
-      - modules/00-vanilla-sideload.yml
-      - modules/00-vanilla-updates-utility.yml
-      - modules/00-vanilla-prime-utility.yml
-      - modules/02-waydroid-modules.yml
-      - modules/03-fswarn.yml
-      - modules/10-vanilla-abroot-rollback-notifier.yml
-      - modules/50-laptop-goodies.yml
-      - modules/60-media.yml
-      - modules/80-printers.yml
-      - modules/90-3d-utils.yml
-      - modules/100-accessibility.yml
-      - modules/110-fonts.yml
-      - modules/120-network.yml
-      - modules/121-disable-ssh-daemon.yml
-      - modules/130-plymouth.yml
-      - modules/131-plymouth-theme-vanilla.yml
-      - modules/140-password.yml
-      - modules/160-utilities.yml
-      - modules/210-libs-extra.yml
-      - modules/300-hide-image-magick.yml
-      - modules/997-ensure-exec-hooks.yml
-      - modules/998-vanilla-cleanup.yml
-      - modules/999-pkg-cleanup.yml
-      - modules/999-clear-first-setup-steps-unit.yml
-      # Make sure to remove any modules that install conflicting GNOME components
-      # You may need to review the contents of each module
+    - /usr/bin/apt -y install gnome-software
 
   - name: configure-desktop
     type: shell
     commands:
-    # Fix the display manager permissions
-    - |
-      mkdir -p /etc/systemd/system/multi-user.target.wants/
-      ln -s /usr/lib/systemd/system/fix-gdm-permissions.service /etc/systemd/system/multi-user.target.wants/
-      sed -i 's/gdm/lightdm/g' /usr/lib/systemd/system/fix-gdm-permissions.service
-    # Remove gnome-software plugin for snap
+    - mkdir -p /etc/systemd/system/multi-user.target.wants/
+    - ln -s /usr/lib/systemd/system/fix-gdm-permissions.service /etc/systemd/system/multi-user.target.wants/
+    - sed -i 's/gdm/lightdm/g' /usr/lib/systemd/system/fix-gdm-permissions.service
     - rm /usr/lib/*/gnome-software/plugins-*/libgs_plugin_packagekit.so
     - rm -f /usr/share/applications/com.raggesilver.BlackBox.desktop
 
   - name: cleanup
     type: shell
     commands:
-    - apt autoremove -y
-    - apt clean
+    - /usr/bin/apt autoremove -y
+    - /usr/bin/apt clean
     - lpkg --lock
 
   - name: sysconf-setup
