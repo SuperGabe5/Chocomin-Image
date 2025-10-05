@@ -27,5 +27,5 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: VanillaOS 2 Orchid ${{ env.CURRENT_DATE }}
+        name: Chocomin ISO Testing ${{ env.CURRENT_DATE }}
         path: builds/
