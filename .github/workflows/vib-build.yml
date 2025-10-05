@@ -11,7 +11,6 @@ on:
 
 env:
   BUILDX_NO_DEFAULT_ATTESTATIONS: 1
-  # Pin the version to the one you're using
   VIB_VERSION: v1.0.2
   FSGUARD_VERSION: v1.6.1
 
@@ -42,17 +41,8 @@ jobs:
       run: |
         sed 's/ghcr.io\/vanilla-os\/core:dev/ghcr.io\/vanilla-os\/core:main/' -i recipe.yml
 
-    - name: Install dependencies
+    - name: Manual VIB setup (robust)
       run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
-          jq \
-          curl \
-          podman
-
-        - name: Manual VIB setup (robust)
-      run: |
-        VIB_VERSION="v1.0.2"
         TEMP_DIR=$(mktemp -d)
         
         echo "Installing Vib version ${{ env.VIB_VERSION }}"
@@ -67,7 +57,7 @@ jobs:
           build-essential
         
         # Get the asset URLs from the GitHub API
-        VIB_RELEASE_URL="https://api.github.com/repos/Vanilla-OS/Vib/releases/tags/${VIB_VERSION}"
+        VIB_RELEASE_URL="https://api.github.com/repos/Vanilla-OS/Vib/releases/tags/${{ env.VIB_VERSION }}"
         ASSETS=$(curl -sL $VIB_RELEASE_URL | jq -r '.assets[] | {name, url} | select(.name | contains("amd64"))')
 
         VIB_BINARY_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("^vib-amd64$")) | .url')
@@ -85,7 +75,7 @@ jobs:
         curl -fsL -H "Accept: application/octet-stream" "$PLUGINS_ARCHIVE_URL" | sudo tar -xzf - -C /usr/share/vib/plugins/
         
         # Download and install the custom plugin (vib-fsguard)
-        curl -fsL "https://github.com/Vanilla-OS/vib-fsguard/releases/download/v1.6.1/fsguard.so" | sudo tee /usr/share/vib/plugins/fsguard.so > /dev/null
+        curl -fsL "https://github.com/Vanilla-OS/vib-fsguard/releases/download/${{ env.FSGUARD_VERSION }}/fsguard.so" | sudo tee /usr/share/vib/plugins/fsguard.so > /dev/null
         
         # Check plugin presence and vib dependencies
         echo "Listing contents of /usr/share/vib/plugins/"
@@ -97,6 +87,14 @@ jobs:
         vib --version
         
         rm -rf "$TEMP_DIR"
+
+    - name: Build recipe
+      run: vib build recipe.yml
+
+    - uses: actions/upload-artifact@v4
+      with:
+         name: Containerfile
+         path: Containerfile
 
     - name: Generate image name
       run: |
