@@ -11,8 +11,6 @@ on:
 
 env:
   BUILDX_NO_DEFAULT_ATTESTATIONS: 1
-  VIB_VERSION: v1.0.2
-  FSGUARD_VERSION: v1.6.1
 
 jobs:
   verify-image:
@@ -41,55 +39,11 @@ jobs:
       run: |
         sed 's/ghcr.io\/vanilla-os\/core:dev/ghcr.io\/vanilla-os\/core:main/' -i recipe.yml
 
-    - name: Manual VIB setup (robust)
-      run: |
-        TEMP_DIR=$(mktemp -d)
-        
-        echo "Installing Vib version ${{ env.VIB_VERSION }}"
-        
-        # Install necessary dependencies
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
-          jq \
-          curl \
-          podman \
-          libglib2.0-dev \
-          build-essential
-        
-        # Get the asset URLs from the GitHub API
-        VIB_RELEASE_URL="https://api.github.com/repos/Vanilla-OS/Vib/releases/tags/${{ env.VIB_VERSION }}"
-        ASSETS=$(curl -sL $VIB_RELEASE_URL | jq -r '.assets[] | {name, url} | select(.name | contains("amd64"))')
-
-        VIB_BINARY_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("^vib-amd64$")) | .url')
-        PLUGINS_ARCHIVE_URL=$(echo "$ASSETS" | jq -r 'select(.name | test("plugins-amd64.tar.gz$")) | .url')
-
-        # Create the necessary directories
-        sudo mkdir -p /usr/share/vib/plugins
-        
-        # Download and install the vib binary
-        curl -fsL -H "Accept: application/octet-stream" "$VIB_BINARY_URL" > "${TEMP_DIR}/vib-amd64"
-        sudo mv "${TEMP_DIR}/vib-amd64" /usr/local/bin/vib
-        sudo chmod +x /usr/local/bin/vib
-        
-        # Download and extract the core plugins
-        curl -fsL -H "Accept: application/octet-stream" "$PLUGINS_ARCHIVE_URL" | sudo tar -xzf - -C /usr/share/vib/plugins/
-        
-        # Download and install the custom plugin (vib-fsguard)
-        curl -fsL "https://github.com/Vanilla-OS/vib-fsguard/releases/download/${{ env.FSGUARD_VERSION }}/fsguard.so" | sudo tee /usr/share/vib/plugins/fsguard.so > /dev/null
-        
-        # Check plugin presence and vib dependencies
-        echo "Listing contents of /usr/share/vib/plugins/"
-        ls -l /usr/share/vib/plugins/
-        echo "Checking vib dependencies..."
-        ldd /usr/local/bin/vib
-        
-        # Verify vib version
-        vib --version
-        
-        rm -rf "$TEMP_DIR"
-
-    - name: Build recipe
-      run: vib build recipe.yml
+    - name: Build with vib and Podman
+      uses: vanilla-os/vib-gh-action@main # <--- Use the main branch for the latest fixes
+      with:
+        recipe: 'recipe.yml'
+        plugins: 'Vanilla-OS/vib-fsguard:v1.6.1'
 
     - uses: actions/upload-artifact@v4
       with:
