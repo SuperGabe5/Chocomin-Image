@@ -19,6 +19,9 @@ jobs:
     - name: Install needed packages
       run: apt update && apt install debootstrap -y
 
+    - name: set build.sh to executeable
+      run: chmod +x ./build.sh
+
     - name: Build ISO
       run: ./build.sh etc/terraform.conf
 
