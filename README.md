@@ -3,4 +3,4 @@
 <h2>Current State: Pre_Alpha</h2>
 <h2>Failed Build's: 45</h2>
 
-Chocomin is a Vanilla OS based system that uses the Cinnamon desktop environment with the yaru theme and breeze cursors instead gnome
+ChocoMATE is a system based on chocomin that uses the MATE desktop environment instead of cinnamon
