@@ -65,7 +65,7 @@ jobs:
     - name: Extra image tag release
       if: ${{ github.ref_type == 'tag' }}
       run: |
-        echo "EXTRA_TAG=raw,main" >> "$GITHUB_ENV"
+        echo "EXTRA_TAG=raw,classic" >> "$GITHUB_ENV"
 
     - name: Docker meta
       id: docker_meta
