@@ -1,4 +1,4 @@
-<h1>ChocoMATE</h1>
+<h1>ChocoMATE (codename "Verde")</h1>
 <h3>(v0.0.1)</h3>
 <h2>Current State: Pre_Alpha</h2>
 <h2>Failed Build's: 45</h2>
