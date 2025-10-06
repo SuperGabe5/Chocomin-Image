@@ -1,0 +1,9 @@
+name: mate-desktop
+type: apt
+sources:
+  - packages:
+    - mate
+
+    - mate-extras
+
+    - mate-tweaks

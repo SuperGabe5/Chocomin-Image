@@ -1,0 +1,11 @@
+name: set-mate-theme
+type: shell
+commands:
+  # Set the GTK theme to BlackMATE
+  - gsettings set org.mate.interface gtk-theme 'BlackMATE'
+
+  # Set the window manager (Marco) theme to BlackMATE
+  - gsettings set org.mate.Marco.general theme 'BlackMATE'
+
+  # Set the icon theme to BlackMATE
+  - gsettings set org.mate.interface icon-theme 'BlackMATE'
